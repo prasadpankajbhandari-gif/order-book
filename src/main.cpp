@@ -1,121 +1,226 @@
-#include<bits/stdc++.h>
+
+#include <bits/stdc++.h>
 using namespace std;
 
 struct order
 {
     long long id;
-    int sell1buy0;
+    int sell1buy0;      
     int noofunits;
     int price;
     int arrivalsequence;
-    void printdetails()
-    {
-        if(sell1buy0 == 0)
-        {
-        cout << "orderid: " << id << "\n";
-        cout << "this is buy order" << "\n";
-        cout << "maximum price to buy: " << price << "\n";
-        cout << "no of units: " << noofunits << "\n";
-        cout << "details complete" << "\n" << "\n";
-        }
-        else
-        {
-        cout << "orderid: " << id << "\n";
-        cout << "this is sell order" << "\n";
-        cout << "minimum price to sell: " << price << "\n";
-        cout << "no of units: " << noofunits << "\n";
-        cout << "details complete" << "\n" << "\n";
-        }
-    }
 };
 
-template <typename SellPQ, typename BuyPQ>
-void checktradepossibilty(SellPQ& sellorders, BuyPQ& buyorders)
+map<int, list<order>> sells;
+
+map<int, list<order>, greater<int>> buys;
+
+struct OrderLocation
 {
-    while (!buyorders.empty() && !sellorders.empty() &&
-           buyorders.top().price >= sellorders.top().price)
+    bool isSell;
+    int price;
+    list<order>::iterator it;
+};
+
+unordered_map<long long, OrderLocation> orderIndex;
+
+
+void matchOrders()
+{
+    while (!buys.empty() && !sells.empty())
     {
-        order b = buyorders.top();   buyorders.pop();
-        order s = sellorders.top();  sellorders.pop();
+        auto buyLevel = buys.begin();
+        auto sellLevel = sells.begin();
 
-        int qty = min(b.noofunits, s.noofunits);
+        if (buyLevel->first < sellLevel->first)
+            break;
 
-        int tradePrice = (b.arrivalsequence < s.arrivalsequence) ? b.price : s.price;
+        order& b = buyLevel->second.front();
+        order& s = sellLevel->second.front();
 
-        cout << "TRADE: buy " << b.id << " / sell " << s.id
-             << " | " << qty << " units @ " << tradePrice << "\n";
+        int quantity = min(b.noofunits, s.noofunits);
+        int tradePrice;
 
-        b.noofunits -= qty;
-        s.noofunits -= qty;
+        if (b.arrivalsequence < s.arrivalsequence)
+            tradePrice = b.price;
+        else
+            tradePrice = s.price;
 
-        if (b.noofunits > 0) buyorders.push(b);
-        if (s.noofunits > 0) sellorders.push(s);
+        long long buyID = b.id;
+        long long sellID = s.id;
+
+        cout << "TRADE: Buy ID " << buyID
+             << " with Sell ID " << sellID
+             << " | Quantity: " << quantity
+             << " | Price: " << tradePrice << '\n';
+
+        b.noofunits -= quantity;
+        s.noofunits -= quantity;
+
+        if (b.noofunits == 0)
+        {
+            orderIndex.erase(buyID);
+            buyLevel->second.pop_front();
+        }
+        if (s.noofunits == 0)
+        {
+            orderIndex.erase(sellID);
+            sellLevel->second.pop_front();
+        }
+
+        if (buyLevel->second.empty())
+            buys.erase(buyLevel);
+
+        if (sellLevel->second.empty())
+            sells.erase(sellLevel);
     }
-    cout << "all possible transactions already done\n\n";
 }
 
 
-
-int main(void)
+void receiveOrder(const order& o)
 {
-    auto cmp1 = [](const order& a, const order&b)
+    if (o.noofunits <= 0)
     {
-        if(a.price == b.price)
-        {
-            return a.arrivalsequence > b.arrivalsequence;
-        }
-        return a.price < b.price;
-    };
-    auto cmp2 = [](const order& a, const order&b)
-    {
-        if(a.price == b.price)
-        {
-            return a.arrivalsequence > b.arrivalsequence;
-        }
-        return a.price > b.price;
-    };
-    priority_queue <order, vector <order>, decltype(cmp2)> qsell(cmp2);
-    priority_queue <order, vector <order>, decltype(cmp1)> qbuy(cmp1);
-    struct order o1;
-    o1.id = 50;
-    o1.sell1buy0 = 1;
-    o1.noofunits = 30;
-    o1.price = 100;
-    o1.arrivalsequence = 0;
-    qsell.push(o1);
-    struct order o3;
-     o3.id = 52;
-    o3.sell1buy0 = 1;
-    o3.noofunits = 30;
-    o3.price = 100;
-    o3.arrivalsequence = 1;
-    qsell.push(o3);
-    struct order o4;
-    o4.id = 51;
-    o4.sell1buy0 = 0;
-    o4.noofunits = 4;
-    o4.price = 67;
-    o4.arrivalsequence = 4;
-    qbuy.push(o4);
-    struct order o2;
-    o2.id = 51;
-    o2.sell1buy0 = 0;
-    o2.noofunits = 4;
-    o2.price = 67;
-    o2.arrivalsequence = 3;
-    qbuy.push(o2);
+        cout << "Invalid quantity\n";
+        return;
+    }
 
-    checktradepossibilty(qsell, qbuy);
-    while(!qsell.empty())
+    if (o.sell1buy0 != 0 && o.sell1buy0 != 1)
     {
-        struct order orders = qsell.top();
-        qsell.pop();
-        orders.printdetails();
+        cout << "Invalid order type\n";
+        return;
     }
-    while(!qbuy.empty())
+
+    if (orderIndex.count(o.id))
     {
-        struct order orders = qbuy.top();
-        qbuy.pop();
-        orders.printdetails();
+        cout << "Duplicate order ID\n";
+        return;
     }
+
+    if (o.sell1buy0 == 1)
+    {
+        auto& level = sells[o.price];
+
+        auto it = level.insert(level.end(), o);
+
+        orderIndex.emplace(
+            o.id,
+            OrderLocation{true, o.price, it}
+        );
+    }
+    else
+    {
+        auto& level = buys[o.price];
+
+        auto it = level.insert(level.end(), o);
+
+        orderIndex.emplace(
+            o.id,
+            OrderLocation{false, o.price, it}
+        );
+    }
+
+    matchOrders();
+}
+
+bool Modifyorder(long long id, int desired_price)
+{
+    auto found = orderIndex.find(id);
+
+    if(found == orderIndex.end())
+    {
+        cout << "Order with ID: " << id << "not found" << "\n";
+        return;
+    }
+    bool isSell = found->second.isSell;
+    int price = found->second.price;
+    auto it = found->second.it;
+    order sampleorder = *it;
+    cancelOrder(sampleorder.id);
+    sampleorder.price = desired_price;
+    receiveOrder(sampleorder);
+}
+bool cancelOrder(long long id)
+{
+    auto found = orderIndex.find(id);
+
+    if (found == orderIndex.end())
+    {
+        cout << "Order " << id << " not found\n";
+        return false;
+    }
+
+    bool isSell = found->second.isSell;
+    int price = found->second.price;
+    auto it = found->second.it;
+
+    if (isSell)
+    {
+        auto level = sells.find(price);
+
+        level->second.erase(it);
+
+        if (level->second.empty())
+            sells.erase(level);
+    }
+    else
+    {
+        auto level = buys.find(price);
+
+        level->second.erase(it);
+
+        if (level->second.empty())
+            buys.erase(level);
+    }
+
+    orderIndex.erase(found);
+
+    return true;
+}
+
+
+void displayBook()
+{
+    cout << "\n--- SELL ORDERS (lowest price first) ---\n";
+
+    for (auto& level : sells)
+    {
+        for (auto& o : level.second)
+        {
+            cout << "ID: " << o.id
+                 << " | Price: " << o.price
+                 << " | Quantity: " << o.noofunits << '\n';
+        }
+    }
+
+    cout << "\n--- BUY ORDERS (highest price first) ---\n";
+
+    for (auto& level : buys)
+    {
+        for (auto& o : level.second)
+        {
+            cout << "ID: " << o.id
+                 << " | Price: " << o.price
+                 << " | Quantity: " << o.noofunits << '\n';
+        }
+    }
+
+    cout << '\n';
+}
+
+
+int main()
+{
+    receiveOrder({101, 1, 10, 100, 1});
+    receiveOrder({102, 1, 20, 105, 2});
+
+    receiveOrder({201, 0, 15, 110, 3});
+
+    displayBook();
+
+    cancelOrder(102);
+
+    displayBook();
+
+    return 0;
 }
