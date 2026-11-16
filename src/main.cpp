@@ -12,7 +12,7 @@ struct order
 };
 
 map<int, list<order>> sells;
-
+int globalSeq = 3;
 map<int, list<order>, greater<int>> buys;
 
 struct OrderLocation
@@ -122,21 +122,6 @@ void receiveOrder(const order& o)
 
     matchOrders();
 }
-
-bool Modifyorder(long long id, int desired_price)
-{
-    auto found = orderIndex.find(id);
-    if (found == orderIndex.end())
-    {
-        cout << "Order with ID: " << id << " not found\n";
-        return false;
-    }
-    order o = *(found->second.it);
-    cancelOrder(id);
-    o.price = desired_price;
-    o.arrivalsequence = ++globalSeq;   
-    return true;
-}
 bool cancelOrder(long long id)
 {
     auto found = orderIndex.find(id);
@@ -174,6 +159,22 @@ bool cancelOrder(long long id)
 
     return true;
 }
+bool Modifyorder(long long id, int desired_price)
+{
+    auto found = orderIndex.find(id);
+    if (found == orderIndex.end())
+    {
+        cout << "Order with ID: " << id << " not found\n";
+        return false;
+    }
+    order o = *(found->second.it);
+    cancelOrder(id);
+    o.price = desired_price;
+    o.arrivalsequence = ++globalSeq;
+    receiveOrder(o);
+    return true;
+}
+
 
 
 void displayBook()
