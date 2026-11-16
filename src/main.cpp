@@ -126,19 +126,16 @@ void receiveOrder(const order& o)
 bool Modifyorder(long long id, int desired_price)
 {
     auto found = orderIndex.find(id);
-
-    if(found == orderIndex.end())
+    if (found == orderIndex.end())
     {
-        cout << "Order with ID: " << id << "not found" << "\n";
-        return;
+        cout << "Order with ID: " << id << " not found\n";
+        return false;
     }
-    bool isSell = found->second.isSell;
-    int price = found->second.price;
-    auto it = found->second.it;
-    order sampleorder = *it;
-    cancelOrder(sampleorder.id);
-    sampleorder.price = desired_price;
-    receiveOrder(sampleorder);
+    order o = *(found->second.it);
+    cancelOrder(id);
+    o.price = desired_price;
+    o.arrivalsequence = ++globalSeq;   
+    return true;
 }
 bool cancelOrder(long long id)
 {
